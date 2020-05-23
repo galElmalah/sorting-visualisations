@@ -4,6 +4,16 @@ canvas.height = innerHeight;
 /** @type {CanvasRenderingContext2D} */
 const ctx = canvas.getContext("2d");
 
+const settings = {
+  algorithm: "quickSort",
+  range: {
+    low: 1,
+    high: 150,
+  },
+  speed: 15,
+  start: false,
+};
+
 const randomArrayInRange = ([bottom = 1, top = 100]) => {
   let arr = [];
   for (let i = bottom; i < top; i++) arr.push(i);
@@ -14,6 +24,7 @@ const ACTIONS = {
   swap: (i, j) => ({ type: "swap", index: [i, j] }),
   sorted: (i) => ({ type: "sorted", index: i }),
   comparing: (i, j) => ({ type: "comparing", index: [i, j] }),
+  pivot: (i, j) => ({ type: "pivot", index: i }),
 };
 
 function Line(x, y, width, height, color = "gray") {
@@ -30,20 +41,107 @@ function Line(x, y, width, height, color = "gray") {
 
   this.resetColor = () => (this.color = "gray");
 
+  this.isSorted = () => this.color === "green";
   this.setValue = (v, color) => {
-    this.height = v;
-    this.color = color;
+    if (!this.isSorted()) {
+      this.height = v;
+      this.color = color;
+    }
   };
   this.getValue = (v) => this.height;
 }
 
-const arr = randomArrayInRange([5, 30]);
+const calcLineWidth = () => {
+  return (
+    Math.floor(innerWidth / (settings.range.high - settings.range.low)) - 0.8
+  );
+};
+const calcLineHeightMulti = () => {
+  for (let i = 5; i > 0; i -= 0.25) {
+    if (settings.range.high * i < innerHeight - 25) {
+      return i;
+    }
+  }
+
+  return 0.5;
+};
+const arr = randomArrayInRange([settings.range.low, settings.range.high]);
+
 const lines = [];
+const lineWidth = calcLineWidth();
 arr.forEach((v, i) => {
-  lines.push(new Line(10 * i + i, 10, 10, v * 5, this.color));
+  lines.push(
+    new Line(
+      lineWidth * i + i,
+      0,
+      lineWidth,
+      v * calcLineHeightMulti(),
+      this.color
+    )
+  );
 });
 
 lines.forEach((l) => l.draw());
+const quickSortActions = (array) => {
+  const actions = [];
+  function swap(items, firstIndex, secondIndex) {
+    actions.push(ACTIONS.swap(firstIndex, secondIndex));
+    var temp = items[firstIndex];
+    items[firstIndex] = items[secondIndex];
+    items[secondIndex] = temp;
+  }
+  function partition(items, left, right) {
+    const pivotIndex = Math.floor((right + left) / 2);
+    let pivot = items[pivotIndex];
+    let i = left;
+    let j = right;
+
+    while (i <= j) {
+      while (items[i] < pivot) {
+        i++;
+      }
+
+      while (items[j] > pivot) {
+        j--;
+      }
+
+      if (i <= j) {
+        swap(items, i, j);
+        i++;
+        j--;
+      }
+    }
+
+    return i;
+  }
+  function quickSort(items, left, right) {
+    let index;
+
+    if (items.length > 1) {
+      left = typeof left != "number" ? 0 : left;
+      right = typeof right != "number" ? items.length - 1 : right;
+
+      index = partition(items, left, right);
+      actions.push(ACTIONS.pivot(index));
+      if (left < index - 1) {
+        quickSort(items, left, index - 1);
+      }
+
+      if (index < right) {
+        quickSort(items, index, right);
+      }
+    }
+    actions.push(ACTIONS.sorted(index));
+
+    return items;
+  }
+  quickSort([...array]);
+  actions.push(ACTIONS.sorted(0));
+
+  return actions;
+};
+
+const uniques = (a) => Array.from(new Set([...a]));
 
 const bubbleSort = ([...a], onSort) => {
   const l = a.length;
@@ -88,6 +186,8 @@ function selectionSort([...arr]) {
   return actions;
 }
 
+const isSorted = (arr, i) => arr[i].color === "green";
+
 const actionsMap = {
   swap: (action) => {
     const [i, j] = action.index;
@@ -101,8 +201,14 @@ const actionsMap = {
   },
   comparing: (action) => {
     const [i, j] = action.index;
-    lines[i].color = "blue";
-    lines[j].color = "blue";
+    if (lines[i].color !== "green" && lines[i].color !== "#1DF3FD")
+      lines[i].color = "blue";
+    if (lines[j].color !== "green" && lines[j].color !== "#1DF3FD")
+      lines[j].color = "blue";
+  },
+  pivot: (action) => {
+    const i = action.index;
+    lines[i].color = "#1DF3FD";
   },
 };
 
@@ -114,16 +220,17 @@ const resetSpecifiedColor = (color) =>
 const sortingStates = {
   bubble: bubbleSort(arr),
   selection: selectionSort(arr),
+  quickSort: quickSortActions(uniques(arr)),
 };
 
 function animate() {
-  sortingStates.bubble.forEach((action, i) => {
+  sortingStates[settings.algorithm].forEach((action, i) => {
     setTimeout(() => {
       ctx.clearRect(0, 0, innerWidth, innerHeight);
       actionsMap[action.type](action);
       lines.forEach((l) => l.draw());
       resetSpecifiedColor("yellow");
-    }, 50 * i);
+    }, settings.speed * i);
   });
 }
 
