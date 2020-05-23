@@ -1,24 +1,81 @@
-const canvas = document.getElementById("my-c");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-/** @type {CanvasRenderingContext2D} */
-const ctx = canvas.getContext("2d");
-
 const settings = {
-  algorithm: "quickSort",
+  algorithm: "selection",
   range: {
     low: 1,
-    high: 150,
+    high: 100,
   },
   speed: 15,
   start: false,
 };
+
+let lines = [];
 
 const randomArrayInRange = ([bottom = 1, top = 100]) => {
   let arr = [];
   for (let i = bottom; i < top; i++) arr.push(i);
   return arr.sort((a, b) => (Math.random() > 0.5 ? 1 : -1));
 };
+
+const arr = randomArrayInRange([settings.range.low, settings.range.high]);
+
+const calcLineWidth = () => {
+  return (
+    Math.floor(innerWidth / (settings.range.high - settings.range.low)) - 0.8
+  );
+};
+const calcLineHeightMulti = () => {
+  for (let i = 5; i > 0; i -= 0.25) {
+    if (settings.range.high * i < innerHeight - 25) {
+      return i;
+    }
+  }
+
+  return 0.5;
+};
+
+const lineWidth = calcLineWidth();
+const initLines = () => {
+  lines = [];
+  arr.forEach((v, i) => {
+    lines.push(
+      new Line(
+        lineWidth * i + i,
+        0,
+        lineWidth,
+        v * calcLineHeightMulti(),
+        this.color
+      )
+    );
+  });
+};
+
+initLines();
+let timers = [];
+
+const canvas = document.getElementById("my-c");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+/** @type {CanvasRenderingContext2D} */
+const ctx = canvas.getContext("2d");
+
+let notCalledYet = true;
+
+Array.from(document.getElementsByTagName("button")).forEach((btn) => {
+  btn.onclick = () => {
+    settings.algorithm = btn.value;
+    if (!notCalledYet) {
+      // restet canvas state
+      timers.forEach((id) => clearTimeout(id));
+      timers = [];
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      initLines();
+    }
+    animate();
+    notCalledYet = false;
+  };
+});
+
+//------------------------
 
 const ACTIONS = {
   swap: (i, j) => ({ type: "swap", index: [i, j] }),
@@ -50,36 +107,6 @@ function Line(x, y, width, height, color = "gray") {
   };
   this.getValue = (v) => this.height;
 }
-
-const calcLineWidth = () => {
-  return (
-    Math.floor(innerWidth / (settings.range.high - settings.range.low)) - 0.8
-  );
-};
-const calcLineHeightMulti = () => {
-  for (let i = 5; i > 0; i -= 0.25) {
-    if (settings.range.high * i < innerHeight - 25) {
-      return i;
-    }
-  }
-
-  return 0.5;
-};
-const arr = randomArrayInRange([settings.range.low, settings.range.high]);
-
-const lines = [];
-const lineWidth = calcLineWidth();
-arr.forEach((v, i) => {
-  lines.push(
-    new Line(
-      lineWidth * i + i,
-      0,
-      lineWidth,
-      v * calcLineHeightMulti(),
-      this.color
-    )
-  );
-});
 
 lines.forEach((l) => l.draw());
 const quickSortActions = (array) => {
@@ -148,6 +175,7 @@ const bubbleSort = ([...a], onSort) => {
   const actions = [];
   for (let i = 0; i < l; i++) {
     for (let j = i; j < l; j++) {
+      actions.push(ACTIONS.comparing(i, j));
       if (a[i] > a[j]) {
         actions.push(ACTIONS.swap(i, j));
         let tmp = a[i];
@@ -222,16 +250,15 @@ const sortingStates = {
   selection: selectionSort(arr),
   quickSort: quickSortActions(uniques(arr)),
 };
-
 function animate() {
   sortingStates[settings.algorithm].forEach((action, i) => {
-    setTimeout(() => {
-      ctx.clearRect(0, 0, innerWidth, innerHeight);
-      actionsMap[action.type](action);
-      lines.forEach((l) => l.draw());
-      resetSpecifiedColor("yellow");
-    }, settings.speed * i);
+    timers.push(
+      setTimeout(() => {
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        actionsMap[action.type](action);
+        lines.forEach((l) => l.draw());
+        resetSpecifiedColor("yellow");
+      }, settings.speed * i)
+    );
   });
 }
-
-animate();
