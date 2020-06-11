@@ -2,12 +2,12 @@ const settings = {
   algorithm: "selection",
   range: {
     low: 1,
-    high: 100,
+    high: 40,
   },
-  speed: 15,
+  speed: 30,
   start: false,
 };
-
+const compares = document.getElementById("compares");
 let lines = [];
 
 const randomArrayInRange = ([bottom = 1, top = 100]) => {
@@ -24,7 +24,7 @@ const calcLineWidth = () => {
   );
 };
 const calcLineHeightMulti = () => {
-  for (let i = 5; i > 0; i -= 0.25) {
+  for (let i = 20; i > 0; i -= 0.25) {
     if (settings.range.high * i < innerHeight - 25) {
       return i;
     }
@@ -69,6 +69,7 @@ Array.from(document.getElementsByTagName("button")).forEach((btn) => {
       timers = [];
       ctx.clearRect(0, 0, innerWidth, innerHeight);
       initLines();
+      compares.innerText = "";
     }
     animate();
     notCalledYet = false;
@@ -126,10 +127,12 @@ const quickSortActions = (array) => {
     while (i <= j) {
       while (items[i] < pivot) {
         i++;
+        actions.push(ACTIONS.comparing(pivotIndex, i));
       }
 
       while (items[j] > pivot) {
         j--;
+        actions.push(ACTIONS.comparing(pivotIndex, j));
       }
 
       if (i <= j) {
@@ -170,22 +173,20 @@ const quickSortActions = (array) => {
 
 const uniques = (a) => Array.from(new Set([...a]));
 
-const bubbleSort = ([...a], onSort) => {
-  const l = a.length;
-  const actions = [];
-  for (let i = 0; i < l; i++) {
-    for (let j = i; j < l; j++) {
-      actions.push(ACTIONS.comparing(i, j));
-      if (a[i] > a[j]) {
-        actions.push(ACTIONS.swap(i, j));
-        let tmp = a[i];
-        a[i] = a[j];
-        a[j] = tmp;
+const bubbleSort = ([...array], onAction) => {
+  let actions = [];
+  for (let i = 0; i < array.length; i++) {
+    for (let j = 0; j < array.length; j++) {
+      actions.push(ACTIONS.comparing(j, j + 1));
+      if (array[j] > array[j + 1]) {
+        let tmp = array[j];
+        array[j] = array[j + 1];
+        array[j + 1] = tmp;
+        actions.push(ACTIONS.swap(j, j + 1));
       }
     }
-    actions.push(ACTIONS.sorted(i));
+    actions.push(ACTIONS.sorted(array.length - i - 1));
   }
-
   return actions;
 };
 
@@ -201,7 +202,7 @@ function selectionSort([...arr]) {
         min = j; // updating the index of minimum element
       }
     }
-
+    actions.push(ACTIONS.comparing(i, min));
     if (i !== min) {
       let temp = arr[i];
       actions.push(ACTIONS.swap(i, min));
@@ -217,18 +218,19 @@ function selectionSort([...arr]) {
 const isSorted = (arr, i) => arr[i].color === "green";
 
 const actionsMap = {
+  sorted: (action) => {
+    const i = action.index;
+    lines[i].color = "green";
+  },
   swap: (action) => {
     const [i, j] = action.index;
     let tmp = lines[i].getValue();
     lines[i].setValue(lines[j].getValue(), "red");
     lines[j].setValue(tmp, "yellow");
   },
-  sorted: (action) => {
-    const i = action.index;
-    lines[i].color = "green";
-  },
   comparing: (action) => {
     const [i, j] = action.index;
+    compares.innerText = 1 + Number(compares.innerText);
     if (lines[i].color !== "green" && lines[i].color !== "#1DF3FD")
       lines[i].color = "blue";
     if (lines[j].color !== "green" && lines[j].color !== "#1DF3FD")
@@ -246,18 +248,19 @@ const resetSpecifiedColor = (color) =>
   );
 
 const sortingStates = {
-  bubble: bubbleSort(arr),
-  selection: selectionSort(arr),
-  quickSort: quickSortActions(uniques(arr)),
+  bubble: () => bubbleSort(arr),
+  selection: () => selectionSort(arr),
+  quickSort: () => quickSortActions(uniques(arr)),
 };
 function animate() {
-  sortingStates[settings.algorithm].forEach((action, i) => {
+  sortingStates[settings.algorithm]().forEach((action, i) => {
     timers.push(
       setTimeout(() => {
         ctx.clearRect(0, 0, innerWidth, innerHeight);
         actionsMap[action.type](action);
         lines.forEach((l) => l.draw());
         resetSpecifiedColor("yellow");
+        resetSpecifiedColor("red");
       }, settings.speed * i)
     );
   });
